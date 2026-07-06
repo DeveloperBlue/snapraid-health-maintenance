@@ -166,6 +166,44 @@ shm_get_physical_disks() {
     lsblk -d -n -o NAME,TYPE | awk '$2=="disk" {print "/dev/"$1}'
 }
 
+# Resolve a mount path or block device to its parent physical disk.
+shm_get_base_disk() {
+    local dev="$1"
+    local type pkname
+
+    [ -n "$dev" ] || return 1
+    if [ ! -b "$dev" ]; then
+        dev=$(findmnt -n -o SOURCE --target "$dev" 2>/dev/null)
+    fi
+    [ -n "$dev" ] && [ -b "$dev" ] || return 1
+
+    while true; do
+        type=$(lsblk -no TYPE "$dev" 2>/dev/null | head -n 1 | tr -d '[:space:]')
+        [ "$type" = "disk" ] && printf '%s' "$dev" && return 0
+        pkname=$(lsblk -no PKNAME "$dev" 2>/dev/null | head -n 1 | tr -d '[:space:]')
+        [ -z "$pkname" ] && printf '%s' "$dev" && return 0
+        dev="/dev/$pkname"
+    done
+}
+
+shm_get_disk_model() {
+    local dev="$1"
+    local model
+
+    dev=$(shm_get_base_disk "$dev") || return 1
+    model=$(lsblk -dno MODEL "$dev" 2>/dev/null | head -n 1 | sed 's/[[:space:]]*$//')
+    [ -n "$model" ] && printf '%s' "$model"
+}
+
+shm_get_disk_serial() {
+    local dev="$1"
+    local serial
+
+    dev=$(shm_get_base_disk "$dev") || return 1
+    serial=$(lsblk -dno SERIAL "$dev" 2>/dev/null | head -n 1 | sed 's/[[:space:]]*$//')
+    [ -n "$serial" ] && printf '%s' "$serial"
+}
+
 shm_smartctl_invoke() {
     local dev="$1"
     shift

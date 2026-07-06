@@ -128,9 +128,44 @@ shm_html_usage_bar() {
         "$pct" "$color" "$pct"
 }
 
+shm_disk_space_identity() {
+    local source="$1"
+    local model serial
+
+    model=$(shm_get_disk_model "$source")
+    serial=$(shm_get_disk_serial "$source")
+    [ -z "$model" ] && model="Unknown"
+    [ -z "$serial" ] && serial="—"
+    printf '%s\t%s' "$model" "$serial"
+}
+
+shm_text_disk_space_table() {
+    local mounts=("$@")
+    local line source size used avail pcent target pct model serial
+
+    if [ ${#mounts[@]} -eq 0 ]; then
+        printf '%s' '(no mounted filesystems on physical disks)'
+        return 0
+    fi
+
+    printf '%-16s %-28s %-16s %6s %6s %6s %5s %s\n' \
+        "Filesystem" "Model" "Serial" "Size" "Used" "Avail" "Use%" "Mount"
+
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        read -r source size used avail pcent target <<< "$line"
+        pct="${pcent%%%}"
+        [[ "$pct" =~ ^[0-9]+$ ]] || pct=0
+        IFS=$'\t' read -r model serial <<< "$(shm_disk_space_identity "$source")"
+
+        printf '%-16s %-28s %-16s %6s %6s %6s %4s%% %s\n' \
+            "$source" "$model" "$serial" "$size" "$used" "$avail" "$pct" "$target"
+    done < <(df -h --output=source,size,used,avail,pcent,target "${mounts[@]}" 2>/dev/null | tail -n +2)
+}
+
 shm_html_disk_space_table() {
     local mounts=("$@")
-    local line source size used avail pcent target pct
+    local line source size used avail pcent target pct model serial
 
     if [ ${#mounts[@]} -eq 0 ]; then
         printf '%s' '<p style="color:#666;">(no mounted filesystems on physical disks)</p>'
@@ -140,6 +175,8 @@ shm_html_disk_space_table() {
     printf '%s' '<table style="border-collapse:collapse;width:100%%;font-size:13px;margin-top:4px;">'
     printf '%s' '<tr style="background:#f5f5f5;">'
     printf '%s' '<th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e0e0e0;">Filesystem</th>'
+    printf '%s' '<th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e0e0e0;">Model</th>'
+    printf '%s' '<th style="padding:10px 12px;text-align:left;border-bottom:2px solid #e0e0e0;">Serial</th>'
     printf '%s' '<th style="padding:10px 12px;text-align:right;border-bottom:2px solid #e0e0e0;">Size</th>'
     printf '%s' '<th style="padding:10px 12px;text-align:right;border-bottom:2px solid #e0e0e0;">Used</th>'
     printf '%s' '<th style="padding:10px 12px;text-align:right;border-bottom:2px solid #e0e0e0;">Avail</th>'
@@ -152,9 +189,12 @@ shm_html_disk_space_table() {
         read -r source size used avail pcent target <<< "$line"
         pct="${pcent%%%}"
         [[ "$pct" =~ ^[0-9]+$ ]] || pct=0
+        IFS=$'\t' read -r model serial <<< "$(shm_disk_space_identity "$source")"
 
         printf '<tr>'
         printf '<td style="padding:10px 12px;border-bottom:1px solid #eee;font-family:Courier New,Courier,monospace;font-size:12px;">%s</td>' "$(shm_html_escape "$source")"
+        printf '<td style="padding:10px 12px;border-bottom:1px solid #eee;">%s</td>' "$(shm_html_escape "$model")"
+        printf '<td style="padding:10px 12px;border-bottom:1px solid #eee;font-family:Courier New,Courier,monospace;font-size:12px;">%s</td>' "$(shm_html_escape "$serial")"
         printf '<td style="padding:10px 12px;border-bottom:1px solid #eee;text-align:right;">%s</td>' "$(shm_html_escape "$size")"
         printf '<td style="padding:10px 12px;border-bottom:1px solid #eee;text-align:right;">%s</td>' "$(shm_html_escape "$used")"
         printf '<td style="padding:10px 12px;border-bottom:1px solid #eee;text-align:right;">%s</td>' "$(shm_html_escape "$avail")"
@@ -300,7 +340,7 @@ EOF
 
     if [ "$run_disk_usage" = true ] || [ "$run_smart" = true ]; then
         if [ ${#DISK_SPACE_MOUNTS[@]} -gt 0 ]; then
-            disk_space_text=$(df -h "${DISK_SPACE_MOUNTS[@]}" 2>/dev/null)
+            disk_space_text=$(shm_text_disk_space_table "${DISK_SPACE_MOUNTS[@]}")
             disk_space_html=$(shm_html_disk_space_table "${DISK_SPACE_MOUNTS[@]}")
         else
             disk_space_text="(no mounted filesystems on physical disks)"
