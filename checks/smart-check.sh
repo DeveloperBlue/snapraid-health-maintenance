@@ -1,7 +1,7 @@
 #!/bin/bash
 # SMART hardware health checks for physical disks.
 
-SHM_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SHM_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/common.sh
 source "$SHM_ROOT_DIR/lib/common.sh"
 

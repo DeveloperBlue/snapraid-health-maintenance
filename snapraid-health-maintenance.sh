@@ -24,12 +24,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 # shellcheck source=lib/args.sh
 source "$SCRIPT_DIR/lib/args.sh"
-# shellcheck source=snapraid-check.sh
-source "$SCRIPT_DIR/snapraid-check.sh"
-# shellcheck source=smart-check.sh
-source "$SCRIPT_DIR/smart-check.sh"
-# shellcheck source=disk-usage-check.sh
-source "$SCRIPT_DIR/disk-usage-check.sh"
+# shellcheck source=checks/snapraid-check.sh
+source "$SCRIPT_DIR/checks/snapraid-check.sh"
+# shellcheck source=checks/smart-check.sh
+source "$SCRIPT_DIR/checks/smart-check.sh"
+# shellcheck source=checks/disk-usage-check.sh
+source "$SCRIPT_DIR/checks/disk-usage-check.sh"
 
 shm_load_config
 shm_parse_args "$@"

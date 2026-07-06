@@ -11,9 +11,9 @@ This project does not manage your SnapRAID array configuration (`/etc/snapraid.c
 | File | Purpose |
 |------|---------|
 | `snapraid-health-maintenance.sh` | Main entry point — orchestrates checks and sends summary emails |
-| `snapraid-check.sh` | SnapRAID touch, sync, scrub, and status |
-| `smart-check.sh` | SMART hardware health on physical disks |
-| `disk-usage-check.sh` | Mount-point usage warnings |
+| `checks/snapraid-check.sh` | SnapRAID touch, sync, scrub, and status |
+| `checks/smart-check.sh` | SMART hardware health on physical disks |
+| `checks/disk-usage-check.sh` | Mount-point usage warnings |
 | `lib/common.sh` | Shared config, logging, and helpers |
 | `lib/args.sh` | Command-line flag parsing |
 | `lib/mail.sh` | useSend and `mail` notification delivery |
@@ -29,7 +29,7 @@ Clone the repo into `/opt/snapraid-health-maintenance`.
 sudo git clone git@github.com:DeveloperBlue/snapraid-health-maintenance.git /opt/snapraid-health-maintenance
 cd /opt/snapraid-health-maintenance
 sudo cp snapraid-health-maintenance.conf.example snapraid-health-maintenance.conf
-sudo chmod +x snapraid-health-maintenance.sh snapraid-check.sh smart-check.sh disk-usage-check.sh
+sudo chmod +x snapraid-health-maintenance.sh checks/snapraid-check.sh checks/smart-check.sh checks/disk-usage-check.sh
 sudo chmod 600 snapraid-health-maintenance.conf
 ```
 
