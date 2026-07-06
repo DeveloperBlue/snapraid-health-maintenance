@@ -33,6 +33,8 @@ shm_load_config() {
     SMART_BIN="${SMART_BIN:-}"
     DISK_USAGE_WARN_PERCENT="${DISK_USAGE_WARN_PERCENT:-90}"
     shm_normalize_disk_usage_ignore_mounts
+    SMART_TEMP_WARN_HDD="${SMART_TEMP_WARN_HDD:-55}"
+    SMART_TEMP_WARN_SSD="${SMART_TEMP_WARN_SSD:-70}"
     LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-60}"
     USESEND_API_URL="${USESEND_API_URL:-}"
     USESEND_FROM="${USESEND_FROM:-}"
@@ -174,4 +176,34 @@ shm_smartctl_invoke() {
 
 shm_is_smart_unsupported() {
     echo "$1" | grep -qiE 'Unavailable|unable to detect device type|Read SMART Data failed|Unsupported|Unknown USB bridge'
+}
+
+shm_smart_info_field() {
+    local info_out="$1"
+    local field="$2"
+    echo "$info_out" | grep -iE "^${field}:" | head -n 1 | sed -E 's/^[^:]+:[[:space:]]*//; s/[[:space:]]+$//'
+}
+
+shm_smart_attr_raw() {
+    local smart_out="$1"
+    local attr="$2"
+    local value
+    value=$(echo "$smart_out" | grep -i "$attr" | awk '{print $10}' | grep -o '[0-9]\+' | head -n 1)
+    [ -n "$value" ] && printf '%s' "$value"
+}
+
+shm_smart_nvme_field() {
+    local smart_out="$1"
+    local field="$2"
+    echo "$smart_out" | grep -iE "^${field}:" | head -n 1 | grep -o '[0-9]\+' | head -n 1
+}
+
+shm_is_ssd_device() {
+    local dev="$1"
+    local rota
+    case "$dev" in
+        /dev/nvme*) return 0 ;;
+    esac
+    rota=$(lsblk -dno ROTA "$dev" 2>/dev/null | tr -d '[:space:]')
+    [ "$rota" = "0" ]
 }

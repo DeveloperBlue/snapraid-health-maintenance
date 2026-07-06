@@ -36,6 +36,10 @@ SCRUB_PERCENT=20
 # Warn when a mount on any physical disk reaches this usage %
 DISK_USAGE_WARN_PERCENT=90
 
+# SMART temperature warnings (°C)
+SMART_TEMP_WARN_HDD=55
+SMART_TEMP_WARN_SSD=70
+
 # Mount paths to skip for usage warnings (still shown in disk space report).
 # One quoted path per line.
 DISK_USAGE_IGNORE_MOUNTS=(
