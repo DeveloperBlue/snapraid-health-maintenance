@@ -1,0 +1,14 @@
+# snapraid-health-maintenance.conf
+# Copy to snapraid-health-maintenance.conf alongside the script and edit for your system.
+
+EMAIL="you@example.com"
+LOG_DIR="/var/log/snapraid"
+SNAPRAID_BIN="/usr/bin/snapraid"
+# Leave empty to auto-detect smartctl on PATH
+SMART_BIN=""
+SCRUB_PERCENT=20
+
+# Array disks to monitor for capacity limits
+DISK_1="/mnt/Media Disk Primary"
+DISK_2="/mnt/Media Disk Secondary"
+DISK_3="/mnt/Media Disk Parity"

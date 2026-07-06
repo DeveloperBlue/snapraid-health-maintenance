@@ -3,14 +3,12 @@
 # snapraid-health-maintenance.sh
 # Runs SnapRAID and/or SMART health reporting based on parameters.
 #
-# Install:
-#   sudo cp snapraid-health-maintenance.sh /usr/local/bin/snapraid-health-maintenance.sh
-#   sudo chmod +x /usr/local/bin/snapraid-health-maintenance..sh
+# Install: see README.md (git clone to /opt/snapraid-health-maintenance)
 #
 # Schedule (cron - run as root):
 #   sudo crontab -e
-#   0 3 * * * /usr/local/bin/snapraid-health-maintenance.sh sync
-#   0 5 * * 1 /usr/local/bin/snapraid-health-maintenance.sh scrub
+#   0 4 * * * /opt/snapraid-health-maintenance/snapraid-health-maintenance.sh sync
+#   0 5 * * 1 /opt/snapraid-health-maintenance/snapraid-health-maintenance.sh scrub
 #
 # Usage:
 #   sudo ./snapraid-health-maintenance.sh sync          (Runs SnapRAID Sync + SMART)
@@ -23,18 +21,23 @@
 # -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
-EMAIL="michaelrooplall@gmail.com"
-HOSTNAME=$(hostname)
-LOG_DIR="/var/log/snapraid"
-LOG_FILE="$LOG_DIR/snapraid-$(date +%Y-%m-%d).log"
-SNAPRAID_BIN="/usr/bin/snapraid"
-SMART_BIN=$(which smartctl 2>/dev/null || echo "/usr/sbin/smartctl")
-SCRUB_PERCENT=20    # Percentage of array to scrub per weekly run
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="${SNAPRAID_HEALTH_CONFIG:-$SCRIPT_DIR/snapraid-health-maintenance.conf}"
 
-# Array disks to monitor for capacity limits
-DISK_1="/mnt/Media Disk Primary"
-DISK_2="/mnt/Media Disk Secondary"
-DISK_3="/mnt/Media Disk Parity"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "ERROR: Config not found at $CONFIG_FILE"
+    echo "Copy snapraid-health-maintenance.conf.example to snapraid-health-maintenance.conf and edit it."
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+source "$CONFIG_FILE"
+
+LOG_FILE="$LOG_DIR/snapraid-$(date +%Y-%m-%d).log"
+HOSTNAME="${HOSTNAME:-$(hostname)}"
+if [ -z "$SMART_BIN" ]; then
+    SMART_BIN=$(which smartctl 2>/dev/null || echo "/usr/sbin/smartctl")
+fi
 
 # -----------------------------------------------------------------------------
 # Argument Parsing & Mode Control
