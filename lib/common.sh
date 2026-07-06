@@ -129,6 +129,8 @@ shm_rotate_old_logs() {
 
 # shellcheck source=lib/mail.sh
 source "$SHM_ROOT_DIR/lib/mail.sh"
+# shellcheck source=lib/report.sh
+source "$SHM_ROOT_DIR/lib/report.sh"
 
 shm_normalize_mount_path() {
     local path="${1%/}"
