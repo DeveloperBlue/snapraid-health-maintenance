@@ -16,6 +16,7 @@ run_smart_check() {
 
     local all_physical_disks base_dev all_out drive_model drive_size
     local temp status_txt status_emoji health_details media_errs realloc pending
+    local errors_before=$ERRORS
 
     all_physical_disks=$(shm_get_physical_disks)
     SMART_REPORT=""
@@ -71,6 +72,14 @@ run_smart_check() {
         SMART_REPORT+="   • Temperature:      ${temp}°C\n"
         SMART_REPORT+="   • Disk Integrity:    $health_details\n\n"
     done
+
+    if [ -n "$SMART_REPORT" ]; then
+        local show_console=false
+        [ "$ERRORS" -gt "$errors_before" ] && show_console=true
+        shm_log_multiline "SMART report:" "$(printf '%b' "$SMART_REPORT")" "$show_console"
+    else
+        shm_log "SMART: no physical disks found"
+    fi
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

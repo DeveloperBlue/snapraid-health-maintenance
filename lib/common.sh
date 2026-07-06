@@ -90,6 +90,30 @@ shm_log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
 }
 
+# Log multi-line command output with timestamps; optional console echo (e.g. on failure).
+shm_log_multiline() {
+    local label="$1"
+    local output="$2"
+    local to_console="${3:-false}"
+
+    shm_log "$label"
+    if [ -z "$output" ]; then
+        shm_log "  (no output)"
+        return
+    fi
+
+    local ts line
+    ts=$(date '+%Y-%m-%d %H:%M:%S')
+    while IFS= read -r line || [ -n "$line" ]; do
+        line="[$ts]   $line"
+        if [ "$to_console" = true ]; then
+            echo "$line" | tee -a "$LOG_FILE"
+        else
+            echo "$line" >> "$LOG_FILE"
+        fi
+    done <<< "$output"
+}
+
 shm_rotate_old_logs() {
     [ "$LOG_RETENTION_DAYS" -eq 0 ] 2>/dev/null && return 0
 

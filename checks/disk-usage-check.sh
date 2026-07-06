@@ -30,6 +30,18 @@ run_disk_usage_check() {
             lsblk -ln -o MOUNTPOINT "$base_dev" 2>/dev/null
         done | sed '/^$/d' | sort -u
     )
+
+    if [ ${#DISK_SPACE_MOUNTS[@]} -gt 0 ]; then
+        shm_log_multiline "Disk space:" "$(df -h "${DISK_SPACE_MOUNTS[@]}" 2>/dev/null)" false
+    else
+        shm_log "Disk space: (no mounted filesystems on physical disks)"
+    fi
+
+    if [ -n "$DISK_WARNINGS" ]; then
+        shm_log_multiline "Disk usage warnings:" "$(printf '%b' "$DISK_WARNINGS")" true
+    else
+        shm_log "Disk usage: all checked mounts below ${DISK_USAGE_WARN_PERCENT}%"
+    fi
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

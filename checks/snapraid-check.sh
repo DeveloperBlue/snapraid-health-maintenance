@@ -18,13 +18,14 @@ run_snapraid_maintenance() {
         shm_log "--- Running: snapraid touch ---"
         TOUCH_OUTPUT=$($SNAPRAID_BIN touch 2>&1)
         TOUCH_EXIT=$?
-        echo "$TOUCH_OUTPUT" >> "$LOG_FILE"
 
         if [ $TOUCH_EXIT -ne 0 ]; then
             shm_log "WARNING: snapraid touch exited with code $TOUCH_EXIT"
+            shm_log_multiline "snapraid touch output:" "$TOUCH_OUTPUT" true
             ERRORS=$((ERRORS + 1))
             REPORT+="⚠️  touch failed (exit code $TOUCH_EXIT)\n"
         else
+            shm_log_multiline "snapraid touch output:" "$TOUCH_OUTPUT" false
             shm_log "touch completed successfully."
             REPORT+="✅ touch completed\n"
         fi
@@ -39,6 +40,7 @@ run_snapraid_maintenance() {
 
         if [ $SYNC_EXIT -ne 0 ]; then
             shm_log "ERROR: snapraid sync failed (exit code $SYNC_EXIT)"
+            shm_log_multiline "snapraid sync output:" "$SYNC_OUTPUT" true
             ERRORS=$((ERRORS + 1))
             REPORT+="❌ sync FAILED (exit code $SYNC_EXIT)\n"
         else
@@ -60,6 +62,7 @@ run_snapraid_maintenance() {
 
         if [ $SCRUB_EXIT -ne 0 ]; then
             shm_log "ERROR: snapraid scrub failed (exit code $SCRUB_EXIT)"
+            shm_log_multiline "snapraid scrub output:" "$SCRUB_OUTPUT" true
             ERRORS=$((ERRORS + 1))
             REPORT+="❌ scrub FAILED (exit code $SCRUB_EXIT)\n"
         else
@@ -88,15 +91,18 @@ run_snapraid_status() {
     shm_log "--- Running: snapraid status ---"
     STATUS_OUTPUT=$($SNAPRAID_BIN status 2>&1)
     STATUS_EXIT=$?
-    echo "$STATUS_OUTPUT" >> "$LOG_FILE"
 
     if [ $STATUS_EXIT -ne 0 ]; then
         shm_log "ERROR: snapraid status failed (exit code $STATUS_EXIT)"
+        shm_log_multiline "snapraid status output:" "$STATUS_OUTPUT" true
         ERRORS=$((ERRORS + 1))
         REPORT+="❌ snapraid status FAILED (exit code $STATUS_EXIT)\n"
-    elif [ "$report_success" = true ]; then
-        shm_log "snapraid status completed successfully."
-        REPORT+="✅ snapraid status completed\n"
+    else
+        shm_log_multiline "snapraid status output:" "$STATUS_OUTPUT" false
+        if [ "$report_success" = true ]; then
+            shm_log "snapraid status completed successfully."
+            REPORT+="✅ snapraid status completed\n"
+        fi
     fi
 }
 
