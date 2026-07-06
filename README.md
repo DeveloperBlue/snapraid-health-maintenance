@@ -99,8 +99,12 @@ Use `DISK_USAGE_IGNORE_MOUNTS` to exclude specific mount paths from that thresho
 SnapRAID parity disks are often intentionally kept nearly full. If you don't want routine high-usage alerts on parity, add those mount points to `DISK_USAGE_IGNORE_MOUNTS` in `snapraid-health-maintenance.conf`, for example:
 
 ```
-DISK_USAGE_IGNORE_MOUNTS="/mnt/parity"
+DISK_USAGE_IGNORE_MOUNTS=(
+    "/mnt/parity"
+)
 ```
+
+Use a bash array with one quoted path per line. Paths that contain spaces (for example `/mnt/Media Disk Parity`) must be quoted inside the array; a single quoted string will not work because the legacy space-separated format cannot represent spaces in mount paths.
 
 # Flags
 

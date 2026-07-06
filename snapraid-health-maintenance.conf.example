@@ -36,5 +36,8 @@ SCRUB_PERCENT=20
 # Warn when a mount on any physical disk reaches this usage %
 DISK_USAGE_WARN_PERCENT=90
 
-# Space-separated mount paths to skip for usage warnings (still shown in disk space report)
-DISK_USAGE_IGNORE_MOUNTS="/mnt/parity"
+# Mount paths to skip for usage warnings (still shown in disk space report).
+# One quoted path per line.
+DISK_USAGE_IGNORE_MOUNTS=(
+    "/mnt/parity"
+)

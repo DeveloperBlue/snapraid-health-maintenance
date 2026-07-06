@@ -32,7 +32,7 @@ shm_load_config() {
     SNAPRAID_BIN="${SNAPRAID_BIN:-}"
     SMART_BIN="${SMART_BIN:-}"
     DISK_USAGE_WARN_PERCENT="${DISK_USAGE_WARN_PERCENT:-90}"
-    DISK_USAGE_IGNORE_MOUNTS="${DISK_USAGE_IGNORE_MOUNTS:-}"
+    shm_normalize_disk_usage_ignore_mounts
     LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-60}"
     USESEND_API_URL="${USESEND_API_URL:-}"
     USESEND_FROM="${USESEND_FROM:-}"
@@ -134,11 +134,24 @@ shm_normalize_mount_path() {
     printf '%s' "$path"
 }
 
+# Config may set DISK_USAGE_IGNORE_MOUNTS as a bash array or a legacy space-separated string.
+shm_normalize_disk_usage_ignore_mounts() {
+    if declare -p DISK_USAGE_IGNORE_MOUNTS 2>/dev/null | grep -q '^declare -a'; then
+        return 0
+    fi
+
+    local legacy="${DISK_USAGE_IGNORE_MOUNTS:-}"
+    DISK_USAGE_IGNORE_MOUNTS=()
+    if [ -n "$legacy" ]; then
+        read -ra DISK_USAGE_IGNORE_MOUNTS <<< "$legacy"
+    fi
+}
+
 shm_is_disk_usage_ignored() {
     local mount="$1"
     local normalized_mount ignored normalized_ignored
     normalized_mount=$(shm_normalize_mount_path "$mount")
-    for ignored in $DISK_USAGE_IGNORE_MOUNTS; do
+    for ignored in "${DISK_USAGE_IGNORE_MOUNTS[@]}"; do
         normalized_ignored=$(shm_normalize_mount_path "$ignored")
         [ "$normalized_mount" = "$normalized_ignored" ] && return 0
     done
