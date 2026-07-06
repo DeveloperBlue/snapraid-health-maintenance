@@ -41,6 +41,11 @@ Verify SnapRAID, SMART, disk usage, and email delivery with a read-only status r
 sudo ./snapraid-health-maintenance.sh --status
 ```
 
+View the most recent logs, if necessary
+```sh
+sudo less /var/log/snapraid-health-maintenance/snapraid-$(date +%Y-%m-%d).log
+```
+
 # cron job
 
 Add the main script to root's crontab (SnapRAID and SMART checks require root):
