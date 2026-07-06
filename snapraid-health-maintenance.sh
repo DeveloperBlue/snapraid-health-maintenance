@@ -81,48 +81,11 @@ if [ "$SHOULD_SEND_EMAIL" = true ]; then
         SUBJECT="SnapRAID/Health WARNING - $ERRORS issue(s) during $RUN_DESC"
     fi
 
-    EMAIL_BODY=$(cat <<EOF
-Maintenance Report for $HOSTNAME
-Run date:  $(date)
-Execution: $RUN_DESC
-Duration:  $DURATION minutes
-Errors:    $ERRORS
-EOF
-)
+    shm_build_maintenance_report \
+        "$HOSTNAME" "$(date)" "$RUN_DESC" "$DURATION" "$ERRORS" "$LOG_FILE" \
+        "$RUN_DISK_USAGE" "$RUN_SMART" "$RUN_SNAPRAID_SCRUB"
 
-    if shm_any_snapraid; then
-        EMAIL_BODY+=$(printf "\n\n--- SnapRAID Results ---\n%b" "$REPORT")
-    fi
-
-    if [ "$RUN_DISK_USAGE" = true ] || [ "$RUN_SMART" = true ]; then
-        if [ ${#DISK_SPACE_MOUNTS[@]} -gt 0 ]; then
-            EMAIL_BODY+=$(printf "\n\n--- Disk Space Allocation ---\n%s" "$(df -h "${DISK_SPACE_MOUNTS[@]}" 2>/dev/null)")
-        else
-            EMAIL_BODY+=$'\n\n--- Disk Space Allocation ---\n(no mounted filesystems on physical disks)'
-        fi
-        if [ -n "$DISK_WARNINGS" ]; then
-            EMAIL_BODY+=$(printf "\n%b" "$DISK_WARNINGS")
-        fi
-    fi
-
-    if [ "$RUN_SMART" = true ]; then
-        EMAIL_BODY+=$(printf "\n\n--- Global SMART Hardware Health Report ---\n%b" "$SMART_REPORT")
-    fi
-
-    if [ "$RUN_SNAPRAID_SCRUB" = true ]; then
-        WEEKLY_HISTORY=$(grep -h "maintenance finished\." "$LOG_DIR"/snapraid-*.log 2>/dev/null | sort | tail -n 7)
-        if [ -n "$WEEKLY_HISTORY" ]; then
-            EMAIL_BODY+=$(printf "\n\n--- Past 7 Days Run Summaries ---\n%s" "$WEEKLY_HISTORY")
-        fi
-    fi
-
-    if shm_any_snapraid; then
-        EMAIL_BODY+=$(printf "\n--- SnapRAID Status Snapshot ---\n%s" "$STATUS_OUTPUT")
-    fi
-
-    EMAIL_BODY+=$(printf "\n\n--- Log Reference Location ---\n%s" "$LOG_FILE")
-
-    shm_send_email "$SUBJECT" "$EMAIL_BODY"
+    shm_send_email "$SUBJECT" "$EMAIL_BODY_TEXT" "$EMAIL_BODY_HTML"
 fi
 
 if [ "$ERRORS" -gt 0 ]; then
