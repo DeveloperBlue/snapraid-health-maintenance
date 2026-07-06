@@ -2,7 +2,7 @@
 
 # --- Notifications ---
 
-# Where summary and alert emails are sent
+# Required: where summary and alert emails are sent
 EMAIL="you@example.com"
 
 # useSend REST API (recommended)
@@ -14,7 +14,7 @@ USESEND_API_KEY="us_..."
 
 # --- Paths ---
 
-# Directory for daily run logs
+# Directory for daily run logs (default: /var/log/snapraid-health-maintenance)
 LOG_DIR="/var/log/snapraid-health-maintenance"
 
 # Delete logs older than this many days; set to 0 to disable rotation
@@ -28,7 +28,7 @@ SMART_BIN=""
 
 # --- SnapRAID maintenance ---
 
-# Percentage of the array to scrub per weekly run (20 = full array over ~5 weeks)
+# Percentage of the array to scrub per weekly run (default: 20; full array over ~5 weeks)
 SCRUB_PERCENT=20
 
 # --- Health checks ---
