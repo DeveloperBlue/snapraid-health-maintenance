@@ -14,6 +14,7 @@
 #   sudo ./snapraid-health-maintenance.sh sync          (Runs SnapRAID Sync + SMART)
 #   sudo ./snapraid-health-maintenance.sh scrub         (Runs SnapRAID Scrub + SMART)
 #   sudo ./snapraid-health-maintenance.sh health        (Runs SMART Health ONLY)
+#   sudo ./snapraid-health-maintenance.sh status       (Runs snapraid status + SMART + disk usage)
 #   sudo ./snapraid-health-maintenance.sh sync-only     (Runs SnapRAID Sync ONLY)
 #   sudo ./snapraid-health-maintenance.sh scrub-only    (Runs SnapRAID Scrub ONLY)
 # =============================================================================
@@ -35,15 +36,24 @@ source "$CONFIG_FILE"
 
 LOG_FILE="$LOG_DIR/snapraid-$(date +%Y-%m-%d).log"
 HOSTNAME="${HOSTNAME:-$(hostname)}"
+if [ -z "$SNAPRAID_BIN" ]; then
+    SNAPRAID_BIN=$(which snapraid 2>/dev/null || echo "/usr/bin/snapraid")
+fi
 if [ -z "$SMART_BIN" ]; then
     SMART_BIN=$(which smartctl 2>/dev/null || echo "/usr/sbin/smartctl")
 fi
+DISK_USAGE_WARN_PERCENT="${DISK_USAGE_WARN_PERCENT:-90}"
+DISK_USAGE_IGNORE_MOUNTS="${DISK_USAGE_IGNORE_MOUNTS:-}"
+LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-60}"
+# USESEND_API_KEY is set in snapraid-health-maintenance.conf (keep that file chmod 600).
+USESEND_API_KEY="${USESEND_API_KEY:-}"
 
 # -----------------------------------------------------------------------------
 # Argument Parsing & Mode Control
 # -----------------------------------------------------------------------------
 COMMAND_ARG="${1:-sync}"
-RUN_SNAPRAID=true
+RUN_SNAPRAID=false
+RUN_SNAPRAID_STATUS=false
 RUN_SMART=true
 SNAPRAID_MODE="sync"
 
@@ -68,6 +78,12 @@ case "$COMMAND_ARG" in
         RUN_SMART=true
         RUN_DESC="SMART Health Check Only"
         ;;
+    status)
+        RUN_SNAPRAID=false
+        RUN_SNAPRAID_STATUS=true
+        RUN_SMART=true
+        RUN_DESC="Status Check (snapraid status + SMART + disk usage)"
+        ;;
     sync-only)
         RUN_SNAPRAID=true
         RUN_SMART=false
@@ -81,7 +97,7 @@ case "$COMMAND_ARG" in
         RUN_DESC="SnapRAID Scrub Only"
         ;;
     *)
-        echo "Usage: $0 {sync|scrub|health|sync-only|scrub-only}"
+        echo "Usage: $0 {sync|scrub|health|status|sync-only|scrub-only}"
         exit 1
         ;;
 esac
@@ -95,10 +111,89 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
 }
 
-send_email() {
+rotate_old_logs() {
+    [ "$LOG_RETENTION_DAYS" -eq 0 ] 2>/dev/null && return 0
+
+    local old_logs deleted
+    old_logs=$(find "$LOG_DIR" -maxdepth 1 -name 'snapraid-*.log' -type f -mtime +"$LOG_RETENTION_DAYS" 2>/dev/null)
+    [ -z "$old_logs" ] && return 0
+
+    deleted=$(printf '%s\n' "$old_logs" | wc -l)
+    printf '%s\n' "$old_logs" | xargs rm -f
+    log "Rotated $deleted log file(s) older than ${LOG_RETENTION_DAYS} days."
+}
+
+rotate_old_logs
+
+send_email_via_mail() {
     local subject="$1"
     local body="$2"
     printf '%s\n' "$body" | mail -s "[$HOSTNAME] $subject" "$EMAIL"
+}
+
+send_email_via_usesend() {
+    local subject="$1"
+    local body="$2"
+    local full_subject="[$HOSTNAME] $subject"
+    local payload http_code response_file
+
+    response_file=$(mktemp)
+    payload=$(jq -n \
+        --arg to "$EMAIL" \
+        --arg from "$USESEND_FROM" \
+        --arg subject "$full_subject" \
+        --arg text "$body" \
+        '{to: $to, from: $from, subject: $subject, text: $text}') || {
+        rm -f "$response_file"
+        return 1
+    }
+
+    http_code=$(curl -sS -o "$response_file" -w '%{http_code}' \
+        -X POST "${USESEND_API_URL%/}/v1/emails" \
+        -H "Authorization: Bearer ${USESEND_API_KEY}" \
+        -H "Content-Type: application/json" \
+        --data "$payload") || {
+        rm -f "$response_file"
+        return 1
+    }
+
+    if [ "$http_code" = "200" ]; then
+        rm -f "$response_file"
+        return 0
+    fi
+
+    log "useSend API error (HTTP $http_code): $(cat "$response_file" 2>/dev/null)"
+    rm -f "$response_file"
+    return 1
+}
+
+is_disk_usage_ignored() {
+    local mount="$1"
+    local ignored
+    for ignored in $DISK_USAGE_IGNORE_MOUNTS; do
+        [ "$mount" = "$ignored" ] && return 0
+    done
+    return 1
+}
+
+send_email() {
+    local subject="$1"
+    local body="$2"
+
+    if [ -n "$USESEND_API_URL" ] && [ -n "$USESEND_FROM" ] && [ -n "$USESEND_API_KEY" ] && [ -n "$EMAIL" ]; then
+        if command -v curl >/dev/null && command -v jq >/dev/null; then
+            if send_email_via_usesend "$subject" "$body"; then
+                log "Notification sent via useSend to $EMAIL"
+                return 0
+            fi
+            log "WARNING: useSend failed; falling back to mail"
+        else
+            log "WARNING: curl or jq not found; falling back to mail"
+        fi
+    fi
+
+    send_email_via_mail "$subject" "$body"
+    log "Notification sent via mail to $EMAIL"
 }
 
 # -----------------------------------------------------------------------------
@@ -109,7 +204,7 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-if [ "$RUN_SNAPRAID" = true ] && [ ! -x "$SNAPRAID_BIN" ]; then
+if { [ "$RUN_SNAPRAID" = true ] || [ "$RUN_SNAPRAID_STATUS" = true ]; } && [ ! -x "$SNAPRAID_BIN" ]; then
     send_email "SnapRAID ERROR - snapraid not found" \
         "snapraid binary not found at $SNAPRAID_BIN. Check your installation."
     exit 1
@@ -207,7 +302,32 @@ if [ "$RUN_SNAPRAID" = true ]; then
     # --- Status ---
     log "--- Running: snapraid status ---"
     STATUS_OUTPUT=$($SNAPRAID_BIN status 2>&1)
+    STATUS_EXIT=$?
     echo "$STATUS_OUTPUT" >> "$LOG_FILE"
+    if [ $STATUS_EXIT -ne 0 ]; then
+        log "ERROR: snapraid status failed (exit code $STATUS_EXIT)"
+        ERRORS=$((ERRORS + 1))
+        REPORT+="❌ snapraid status FAILED (exit code $STATUS_EXIT)\n"
+    fi
+fi
+
+# -----------------------------------------------------------------------------
+# SnapRAID Status-Only Block (read-only verification)
+# -----------------------------------------------------------------------------
+if [ "$RUN_SNAPRAID_STATUS" = true ]; then
+    log "--- Running: snapraid status ---"
+    STATUS_OUTPUT=$($SNAPRAID_BIN status 2>&1)
+    STATUS_EXIT=$?
+    echo "$STATUS_OUTPUT" >> "$LOG_FILE"
+
+    if [ $STATUS_EXIT -ne 0 ]; then
+        log "ERROR: snapraid status failed (exit code $STATUS_EXIT)"
+        ERRORS=$((ERRORS + 1))
+        REPORT+="❌ snapraid status FAILED (exit code $STATUS_EXIT)\n"
+    else
+        log "snapraid status completed successfully."
+        REPORT+="✅ snapraid status completed\n"
+    fi
 fi
 
 # -----------------------------------------------------------------------------
@@ -216,20 +336,30 @@ fi
 if [ "$RUN_SMART" = true ]; then
     log "--- Running: Capacity & SMART Hardware Checks ---"
 
-    # Disk space check
+    ALL_PHYSICAL_DISKS=$(lsblk -d -n -o NAME,TYPE | awk '$2=="disk" {print "/dev/"$1}')
+
+    # Disk space check (mount points on the same physical disks as SMART)
     DISK_WARNINGS=""
-    while read -r usage mount; do
-        [[ "$usage" == "Use%" ]] && continue
-        USAGE=$(echo "$usage" | tr -d '%')
-        if [ -n "$USAGE" ] && [ "$USAGE" -ge 90 ] 2>/dev/null; then
+    DISK_SPACE_MOUNTS=()
+    while read -r mount; do
+        DISK_SPACE_MOUNTS+=("$mount")
+        if is_disk_usage_ignored "$mount"; then
+            continue
+        fi
+        USAGE=$(df --output=pcent "$mount" 2>/dev/null | tail -1 | tr -d '% ')
+        if [ -n "$USAGE" ] && [ "$USAGE" -ge "$DISK_USAGE_WARN_PERCENT" ] 2>/dev/null; then
             DISK_WARNINGS+="⚠️  $mount is at ${USAGE}% capacity\n"
             ERRORS=$((ERRORS + 1))
         fi
-    done < <(df --output=pcent,target "$DISK_1" "$DISK_2" "$DISK_3" 2>/dev/null)
+    done < <(
+        for base_dev in $ALL_PHYSICAL_DISKS; do
+            [ ! -b "$base_dev" ] && continue
+            lsblk -ln -o MOUNTPOINT "$base_dev" 2>/dev/null
+        done | sed '/^$/d' | sort -u
+    )
 
     # SMART Check
     SMART_REPORT=""
-    ALL_PHYSICAL_DISKS=$(lsblk -d -n -o NAME,TYPE | awk '$2=="disk" {print "/dev/"$1}')
 
     for base_dev in $ALL_PHYSICAL_DISKS; do
         [ ! -b "$base_dev" ] && continue
@@ -317,12 +447,16 @@ Errors:    $ERRORS
 EOF
 )
 
-    if [ "$RUN_SNAPRAID" = true ]; then
+    if [ "$RUN_SNAPRAID" = true ] || [ "$RUN_SNAPRAID_STATUS" = true ]; then
         EMAIL_BODY+=$(printf "\n\n--- SnapRAID Results ---\n%b" "$REPORT")
     fi
 
     if [ "$RUN_SMART" = true ]; then
-        EMAIL_BODY+=$(printf "\n\n--- Disk Space Allocation ---\n%s" "$(df -h "$DISK_1" "$DISK_2" "$DISK_3" 2>/dev/null)")
+        if [ ${#DISK_SPACE_MOUNTS[@]} -gt 0 ]; then
+            EMAIL_BODY+=$(printf "\n\n--- Disk Space Allocation ---\n%s" "$(df -h "${DISK_SPACE_MOUNTS[@]}" 2>/dev/null)")
+        else
+            EMAIL_BODY+=$'\n\n--- Disk Space Allocation ---\n(no mounted filesystems on physical disks)'
+        fi
         if [ -n "$DISK_WARNINGS" ]; then
             EMAIL_BODY+=$(printf "\n%b" "$DISK_WARNINGS")
         fi
@@ -337,14 +471,13 @@ EOF
         fi
     fi
 
-    if [ "$RUN_SNAPRAID" = true ]; then
+    if [ "$RUN_SNAPRAID" = true ] || [ "$RUN_SNAPRAID_STATUS" = true ]; then
         EMAIL_BODY+=$(printf "\n--- SnapRAID Status Snapshot ---\n%s" "$STATUS_OUTPUT")
     fi
 
     EMAIL_BODY+=$(printf "\n\n--- Log Reference Location ---\n%s" "$LOG_FILE")
 
     send_email "$SUBJECT" "$EMAIL_BODY"
-    log "Summary email dispatched to $EMAIL"
 fi
 
 exit $ERRORS

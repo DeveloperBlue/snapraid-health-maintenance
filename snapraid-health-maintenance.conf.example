@@ -1,14 +1,40 @@
 # snapraid-health-maintenance.conf
-# Copy to snapraid-health-maintenance.conf alongside the script and edit for your system.
 
+# --- Notifications ---
+
+# Where summary and alert emails are sent
 EMAIL="you@example.com"
-LOG_DIR="/var/log/snapraid"
-SNAPRAID_BIN="/usr/bin/snapraid"
-# Leave empty to auto-detect smartctl on PATH
+
+# useSend REST API (recommended)
+# leave USESEND_API_URL empty to use mail only
+
+USESEND_API_URL="https://send.example.com/api"
+USESEND_FROM="snapraid@yourdomain.com"
+USESEND_API_KEY="us_..."
+
+# --- Paths ---
+
+# Directory for daily run logs
+LOG_DIR="/var/log/snapraid-health-maintenance"
+
+# Delete logs older than this many days; set to 0 to disable rotation
+LOG_RETENTION_DAYS=60
+
+# SnapRAID binary path; leave empty to auto-detect on PATH
+SNAPRAID_BIN=""
+
+# smartctl binary path; leave empty to auto-detect on PATH
 SMART_BIN=""
+
+# --- SnapRAID maintenance ---
+
+# Percentage of the array to scrub per weekly run (20 = full array over ~5 weeks)
 SCRUB_PERCENT=20
 
-# Array disks to monitor for capacity limits
-DISK_1="/mnt/Media Disk Primary"
-DISK_2="/mnt/Media Disk Secondary"
-DISK_3="/mnt/Media Disk Parity"
+# --- Health checks ---
+
+# Warn when a mount on any physical disk reaches this usage %
+DISK_USAGE_WARN_PERCENT=90
+
+# Space-separated mount paths to skip for usage warnings (still shown in disk space report)
+DISK_USAGE_IGNORE_MOUNTS="/mnt/parity"
