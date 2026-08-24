@@ -35,6 +35,7 @@ shm_load_config() {
     shm_normalize_disk_usage_ignore_mounts
     SMART_TEMP_WARN_HDD="${SMART_TEMP_WARN_HDD:-55}"
     SMART_TEMP_WARN_SSD="${SMART_TEMP_WARN_SSD:-70}"
+    shm_normalize_smart_udma_crc_exceptions
     LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-60}"
     USESEND_API_URL="${USESEND_API_URL:-}"
     USESEND_FROM="${USESEND_FROM:-}"
@@ -149,6 +150,24 @@ shm_normalize_disk_usage_ignore_mounts() {
     if [ -n "$legacy" ]; then
         read -ra DISK_USAGE_IGNORE_MOUNTS <<< "$legacy"
     fi
+}
+
+# Config may set SMART_UDMA_CRC_EXCEPTIONS as declare -A serial -> max allowed count.
+# When the conf is sourced inside shm_load_config, a plain declare -A is function-local;
+# always promote to a global associative array here.
+shm_normalize_smart_udma_crc_exceptions() {
+    local -A _copy=()
+    local key
+    if declare -p SMART_UDMA_CRC_EXCEPTIONS 2>/dev/null | grep -q '^declare -A'; then
+        for key in "${!SMART_UDMA_CRC_EXCEPTIONS[@]}"; do
+            _copy["$key"]="${SMART_UDMA_CRC_EXCEPTIONS[$key]}"
+        done
+    fi
+    unset SMART_UDMA_CRC_EXCEPTIONS 2>/dev/null || true
+    declare -gA SMART_UDMA_CRC_EXCEPTIONS=()
+    for key in "${!_copy[@]}"; do
+        SMART_UDMA_CRC_EXCEPTIONS["$key"]="${_copy[$key]}"
+    done
 }
 
 shm_is_disk_usage_ignored() {

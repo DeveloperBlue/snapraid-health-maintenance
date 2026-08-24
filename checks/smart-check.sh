@@ -70,7 +70,7 @@ run_smart_check() {
 
     local all_physical_disks base_dev info_out all_out drive_model drive_size
     local temp status_txt status_emoji health_details media_errs realloc pending
-    local serial power_on_hours ssd_wear offline_uncorrect reported_uncorrect udma_crc temp_limit
+    local serial power_on_hours ssd_wear offline_uncorrect reported_uncorrect udma_crc udma_crc_limit temp_limit
     local errors_before=$ERRORS
 
     all_physical_disks=$(shm_get_physical_disks)
@@ -130,7 +130,11 @@ run_smart_check() {
 
         udma_crc=$(shm_smart_attr_raw "$all_out" "UDMA_CRC_Error_Count")
         [ -z "$udma_crc" ] && udma_crc=0
-        [ "$udma_crc" -gt 0 ] && shm_smart_flag_warning status_emoji
+        udma_crc_limit=0
+        if [ -n "$serial" ] && [ -n "${SMART_UDMA_CRC_EXCEPTIONS[$serial]+x}" ]; then
+            udma_crc_limit="${SMART_UDMA_CRC_EXCEPTIONS[$serial]}"
+        fi
+        [ "$udma_crc" -gt "$udma_crc_limit" ] && shm_smart_flag_warning status_emoji
 
         if [[ "$temp" =~ ^[0-9]+$ ]]; then
             if shm_is_ssd_device "$base_dev"; then

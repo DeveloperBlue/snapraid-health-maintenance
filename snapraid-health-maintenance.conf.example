@@ -40,6 +40,12 @@ DISK_USAGE_WARN_PERCENT=90
 SMART_TEMP_WARN_HDD=55
 SMART_TEMP_WARN_SSD=70
 
+# Per-drive UDMA CRC exceptions, keyed by SMART serial (not /dev/sdX).
+# Unlisted drives still warn on any count > 0.
+# Listed serials warn only when the count exceeds the allowed value.
+# declare -gA SMART_UDMA_CRC_EXCEPTIONS
+# SMART_UDMA_CRC_EXCEPTIONS["WD-WCAU4XXXXX"]=1
+
 # Mount paths to skip for usage warnings (still shown in disk space report).
 # One quoted path per line.
 DISK_USAGE_IGNORE_MOUNTS=(

@@ -106,6 +106,15 @@ DISK_USAGE_IGNORE_MOUNTS=(
 
 Use a bash array with one quoted path per line. Paths that contain spaces (for example `/mnt/Media Disk Parity`) must be quoted inside the array; a single quoted string will not work because the legacy space-separated format cannot represent spaces in mount paths.
 
+SMART checks warn on any UDMA CRC count above 0 by default (SMART counters never decrease). To allow a known sticky count on a specific drive without changing that global rule, set `SMART_UDMA_CRC_EXCEPTIONS` in `snapraid-health-maintenance.conf`, keyed by the drive’s SMART serial from `smartctl -i` (not `/dev/sdX`):
+
+```
+declare -gA SMART_UDMA_CRC_EXCEPTIONS
+SMART_UDMA_CRC_EXCEPTIONS["WD-WCAU4XXXXX"]=1
+```
+
+Listed serials warn only when the count exceeds the allowed value. Unlisted drives still warn on any count above 0.
+
 # Flags
 
 All checks are invoked via flags on `snapraid-health-maintenance.sh`. Flags are combinable.
